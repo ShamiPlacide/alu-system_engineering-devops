@@ -1,64 +1,25 @@
 #!/usr/bin/env bash
-# Script that configures a new Ubuntu machine with nginx and custom 404 page
-# Requirements:
-# - Install nginx
-# - Nginx listening on port 80
-# - Root page contains "Holberton School"
-# - Custom 404 page contains "Ceci n'est pas une page"
-# - 404 page returns HTTP 404 error code
-# - Cannot use systemctl for restarting nginx
+# Customizing a 404-error_page
 
-# Check if running as root
-if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root or with sudo" 
-   exit 1
-fi
+# Updating Packages before performing installations
+sudo apt-get update
+sudo apt-get install -y nginx
 
-# Update package list
-apt-get update -y
+# Creating an index.html page
+echo "Hello World!" | sudo tee /var/www/html/index.html
 
-# Install nginx
-apt-get install -y nginx
+# Performing a "moved permanently redirection" (301)
+new_string="server_name _;\n\trewrite ^\/redirect_me https:\/\/github.com\/gilbmura permanent;"
+sudo sed -i "s/server_name _;/$new_string/" /etc/nginx/sites-enabled/default
 
-# Create the main index.html page
-echo "Holberton School for the win!" | tee /var/www/html/index.html > /dev/null
+# Creating a 404 Custom error page
+echo "Ceci n'est pas une page" | sudo tee /var/www/html/404.html
+new_string="listen 80 default_server;\n\terror_page 404 \/404.html;\n\tlocation = \/404.html {\n\t\troot \/var\/www\/html;\n\t\tinternal;\n\t}"
 
-# Create custom 404 error page
-echo "Ceci n'est pas une page" | tee /var/www/html/404.html > /dev/null
+sudo sed -i "s/listen 80 default_server;/$new_string/" /etc/nginx/sites-enabled/default
 
-# Configure nginx with custom 404 page
-# Create a new server configuration that includes the custom 404 page
-{
-    echo "server {"
-    echo "    listen 80 default_server;"
-    echo "    listen [::]:80 default_server;"
-    echo ""
-    echo "    root /var/www/html;"
-    echo "    index index.html index.htm index.nginx-debian.html;"
-    echo ""
-    echo "    server_name _;"
-    echo ""
-    echo "    # Custom 404 error page"
-    echo "    error_page 404 /404.html;"
-    echo "    location = /404.html {"
-    echo "        root /var/www/html;"
-    echo "        internal;"
-    echo "    }"
-    echo ""
-    echo "    location / {"
-    echo "        try_files \$uri \$uri/ =404;"
-    echo "    }"
-    echo "}"
-} > /etc/nginx/sites-available/default
+# Testing configurations for syntax errors
+sudo nginx -t
 
-# Test nginx configuration
-nginx -t
-
-# Start nginx service (using service command instead of systemctl)
-service nginx start
-
-# Enable nginx to start on boot
-update-rc.d nginx enable
-
-# Restart nginx to load the new configuration (using service command)
-service nginx restart
+# restart nginx after implementing changes
+sudo service nginx restart
